@@ -9,7 +9,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.getcwd()  # Use current working directory as project root
 sys.path.insert(0, project_root)
 
-from utils.path_resolver.path_resolver import PathResolver
+from utils.path_resolver import PathResolver
+from utils.logger import LoggerFactory
 
 # Usage:
 # from managers.config_manager import ConfigManager
@@ -38,12 +39,14 @@ class ConfigManager:
             return
         self._initialized = True
         
+        # Use centralized logger instead of internal setup
+        self.logger = LoggerFactory.create_config_manager_logger(verbose=verbose)
+        
         # Use PathResolver with explicit base directories
         self.path_resolver = PathResolver()
         self.config_path = self.path_resolver.resolve(config_path)
         
         self.verbose = verbose
-        self._setup_logger(verbose)
         
         self.logger.debug("Initializing ConfigManager...")
         if not os.path.exists(self.config_path):
@@ -67,17 +70,6 @@ class ConfigManager:
                 from config_keys import ConfigKeys
         
         self.config = ConfigKeys()
-
-    def _setup_logger(self, verbose):
-        """Set up the logger with the specified verbosity."""
-        self.logger = logging.getLogger(__name__)
-        if not self.logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-
-        self.logger.setLevel(logging.DEBUG if verbose else logging.INFO)
 
     def _load_config(self, config_path):
         """Load configuration from a file."""
