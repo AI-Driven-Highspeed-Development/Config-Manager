@@ -9,8 +9,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.getcwd()  # Use current working directory as project root
 sys.path.insert(0, project_root)
 
-from utils.path_resolver import PathResolver
-from utils.logger import LoggerFactory
+from utils.path_resolver_util import PathResolver
+from utils.logger_util import LoggerFactory
 
 # Usage:
 # from managers.config_manager import ConfigManager
