@@ -25,10 +25,10 @@ Usage:
 # SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 # sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-# try:
-#     from .config_manager import ConfigManager, ConfigKeysGenerator
-# except ImportError:
-#     from config_manager import ConfigManager, ConfigKeysGenerator
-# cm = ConfigManager(verbose=False)
+try:
+    from .config_manager import ConfigManager
+except ImportError:
+    from config_manager import ConfigManager
+cm = ConfigManager(verbose=False)
 
 # __all__ = ['ConfigManager', 'ConfigKeysGenerator']
