@@ -2,6 +2,6 @@ version: 0.0.2
 folder_path: managers/config_manager
 type: managers
 
-requirement: 
+requirements: 
   - https://github.com/AI-Driven-Highspeed-Development/Path-Resolver-Util.git
   - https://github.com/AI-Driven-Highspeed-Development/Logger-Util.git
