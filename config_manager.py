@@ -9,7 +9,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.getcwd()  # Use current working directory as project root
 sys.path.insert(0, project_root)
 
-from utils.path_resolver_util import PathResolver
+from utils.path_resolver_util.path_resolver import PathResolver
 from utils.logger_util.logger import get_logger
 
 # Run this file once to generate config keys
