@@ -250,13 +250,7 @@ class ConfigTemplate:
         print("=" * 60)
         
         for module_name, config_data in self.consolidated_config.items():
-            print(f"\n📁 {module_name}:")
-            if isinstance(config_data, dict):
-                for key, value in config_data.items():
-                    print(f"   {key}: {value}")
-            else:
-                print(f"   {config_data}")
-
+            print(f"📁 {module_name} ✅")
 
 def main():
     """Main function for testing ConfigTemplate."""
