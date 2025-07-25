@@ -21,7 +21,19 @@ Usage:
 
 try:
     from .config_manager import ConfigManager
+    from .config_template import ConfigTemplate
 except ImportError:
     from config_manager import ConfigManager
+    from config_template import ConfigTemplate
     
+config_template = ConfigTemplate()
+
+# Generate configuration
+success = config_template.generate_config()
+if success:
+    # Show summary
+    config_template.list_config_summary()
+else:
+    print("Failed to generate configuration.")
+
 cm = ConfigManager(verbose=False)
