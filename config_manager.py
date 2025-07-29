@@ -9,7 +9,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.getcwd()  # Use current working directory as project root
 sys.path.insert(0, project_root)
 
-from utils.path_resolver_util.path_resolver import PathResolver
 from utils.logger_util.logger import get_logger
 
 # Run this file once to generate config keys
@@ -31,17 +30,13 @@ class ConfigManager:
         
         # Use centralized logger instead of internal setup
         self.logger = get_logger("ConfigManager", verbose=verbose)
-        
-        # Use PathResolver with explicit base directories
-        self.path_resolver = PathResolver()
-        self.config_path = self.path_resolver.resolve(config_path)
-        
+        self.config_path = config_path
         self.verbose = verbose
         
         self.logger.debug("Initializing ConfigManager...")
         if not os.path.exists(self.config_path):
             self.logger.debug("Configuration file not found, creating a new one.")
-            self.path_resolver.ensure_directory(self.config_path)
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
             with open(self.config_path, 'w') as file:
                 file.write('{}')
                     

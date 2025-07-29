@@ -1,0 +1,29 @@
+{
+    "ai_instruction": [
+        "AI agent instruction file for module understanding.",
+        "1. Don't edit this ai_instruction field.",
+        "2. Fill out module_description field.",
+        "3. Add usage examples with meaningful names replacing \"example_1\", \"example_2\", etc.",
+        "4. Include only significant examples demonstrating core functionality.",
+        "5. When in doubt, make sure to read source code for full implementation context."
+    ],
+    "module_name": "Config Manager",
+    "module_description": [
+        "A singleton configuration manager that handles JSON-based application configuration with automatic code generation.",
+        "Features include:",
+        "- Automatic config key class generation from JSON configuration when initialized",
+        "- Singleton pattern ensuring single instance across application",
+        "- Integration with PathResolver and Logger utilities",
+        "- Type-safe configuration access through generated dataclasses",
+        "- Automatic handling of nested configuration structures",
+        "- Runtime configuration loading and saving"
+    ],
+    "usage_examples": {
+        "config key class generation": "cm = ConfigManager(config_path='.config');",
+        "basic_initialization": "cm = ConfigManager(config_path='.config', verbose=True)",
+        "saving_configuration": "cm.save_config({'api_key': 'your_key', 'debug_mode': True})",
+        "accessing_config_values": "api_key = cm.config.api_key  # After config keys are generated",
+        "nested_config_handling": "cm.save_config({'database': {'host': 'localhost', 'port': 5432}})",
+        "singleton_behavior": "cm1 = ConfigManager(); cm2 = ConfigManager()  # cm1 and cm2 are the same instance"
+    }
+}

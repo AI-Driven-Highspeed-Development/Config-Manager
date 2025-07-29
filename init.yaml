@@ -3,5 +3,4 @@ folder_path: managers/config_manager
 type: managers
 
 requirements: 
-  - https://github.com/AI-Driven-Highspeed-Development/Path-Resolver-Util.git
   - https://github.com/AI-Driven-Highspeed-Development/Logger-Util.git
