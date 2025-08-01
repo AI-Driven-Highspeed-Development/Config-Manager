@@ -80,6 +80,7 @@ class ConfigManager:
         except Exception as e:
             self.logger.error(f"An error occurred while saving the configuration: {e}")
 
+        
 class ConfigKeysGenerator:
     """Generates configuration keys from the current raw configuration."""
     
