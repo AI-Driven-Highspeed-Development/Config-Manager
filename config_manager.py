@@ -45,16 +45,26 @@ class ConfigManager:
         self.ckg = ConfigKeysGenerator(self.raw_config)
         self.ckg.generate()
         
-        # Import config keys with flexible path handling for new structure
-        try:
-            from managers.config_manager.config_keys import ConfigKeys
-        except ImportError:
-            try:
-                from config_manager.config_keys import ConfigKeys
-            except ImportError:
-                from config_keys import ConfigKeys
-        
+        from managers.config_manager.config_keys import ConfigKeys
         self.config = ConfigKeys()
+
+    @staticmethod
+    def _init_nested_item(item_instance, item_data):
+        """Recursively initialize nested item with data."""
+        for field_name, field_value in item_data.items():
+            if hasattr(item_instance, field_name):
+                if isinstance(field_value, dict):
+                    # Handle nested dict - create nested class instance
+                    nested_class = getattr(item_instance, f'{field_name}_class', None)
+                    if nested_class:
+                        nested_instance = nested_class()
+                        for nested_key, nested_value in field_value.items():
+                            if hasattr(nested_instance, nested_key):
+                                setattr(nested_instance, nested_key, nested_value)
+                        setattr(item_instance, field_name, nested_instance)
+                else:
+                    # Handle simple field
+                    setattr(item_instance, field_name, field_value)
 
     def _load_config(self, config_path):
         """Load configuration from a file."""
@@ -91,7 +101,8 @@ class ConfigKeysGenerator:
         """Generate configuration keys from a predefined source."""
 
         new_str = f"from dataclasses import dataclass\n"
-        new_str += "from typing import List, Optional, Dict, Any\n\n"
+        new_str += "from typing import List, Optional, Dict, Any\n"
+        new_str += "from managers.config_manager.config_manager import ConfigManager\n\n"
         new_str += self._generate("ConfigKeys", self.raw_config)
 
         # Save config_keys.py in the same directory as this file
@@ -107,6 +118,7 @@ class ConfigKeysGenerator:
         new_str = indent + f"@dataclass\n"
         new_str += indent + f"class {class_name}:\n"
         late_handles = False
+        list_classes = {}  # Track classes generated for lists of dicts
 
         for key, value in raw_config.items():
             cleansed_value = self.value_cleanse(value)
@@ -116,6 +128,12 @@ class ConfigKeysGenerator:
                 late_handles = True
                 if cleansed_type in ['dict', 'Dict']:
                     continue
+                elif cleansed_type in ['list', 'List'] and self._is_list_of_dicts_with_common_keys(value):
+                    # Generate a common class for list of dicts with common keys
+                    item_class_name = f"{key}_item"
+                    list_classes[key] = item_class_name
+                    new_str += indent + f"\t{key}: Optional[List['{item_class_name}']] = None\n"
+                    continue
                 
             new_str += indent + f"\t{key}: Optional[{cleansed_type}] = {cleansed_value}\n"
 
@@ -123,6 +141,13 @@ class ConfigKeysGenerator:
         
         if late_handles:
             new_str += indent + "\n"
+            
+            # Generate classes for lists of dicts with common keys
+            for key, item_class_name in list_classes.items():
+                common_structure = self._get_common_dict_structure(raw_config[key])
+                new_str += f"{self._generate(item_class_name, common_structure, indent_count + 1)}\n"
+            
+            # Generate classes for regular dicts
             for key, value in raw_config.items():
                 if isinstance(value, dict) or isinstance(value, Dict):
                     new_str += f"{self._generate(f"{key}_class", value, indent_count + 1)}\n"
@@ -130,12 +155,75 @@ class ConfigKeysGenerator:
             new_str += indent + "\tdef __init__(self):\n"
             for key, value in raw_config.items():
                 if isinstance(value, list) or isinstance(value, List):
-                    new_str += indent + f"\t\tself.{key} = {value}\n"
+                    if key in list_classes:
+                        # For lists of dicts with common keys, create list of class instances
+                        # Use unified approach for both simple and complex structures
+                        new_str += indent + f"\t\tself.{key} = []\n"
+                        new_str += indent + f"\t\tfor item_data in {value}:\n"
+                        new_str += indent + f"\t\t\titem_instance = self.{list_classes[key]}()\n"
+                        new_str += indent + f"\t\t\tConfigManager._init_nested_item(item_instance, item_data)\n"
+                        new_str += indent + f"\t\t\tself.{key}.append(item_instance)\n"
+                    else:
+                        # For regular lists
+                        new_str += indent + f"\t\tself.{key} = {value}\n"
                 if isinstance(value, dict) or isinstance(value, Dict):
                     new_str += indent + f"\t\tself.{key} = self.{key}_class()\n"
             new_str += indent + "\t\tpass\n"
             
         return new_str
+    
+    def _is_list_of_dicts_with_common_keys(self, value: List) -> bool:
+        """Check if a list contains dictionaries with common keys."""
+        if not isinstance(value, list) or len(value) == 0:
+            return False
+        
+        # Check if all items are dictionaries
+        if not all(isinstance(item, dict) for item in value):
+            return False
+        
+        # Check if there are at least 2 items and they have common keys
+        if len(value) < 2:
+            return len(value) == 1 and isinstance(value[0], dict)  # Single dict is also valid
+        
+        # Get keys from first dict
+        first_keys = set(value[0].keys())
+        
+        # Check if all other dicts have the same keys (or subset)
+        for item in value[1:]:
+            if not isinstance(item, dict):
+                return False
+            # Allow for common subset of keys
+            if not first_keys.intersection(set(item.keys())):
+                return False
+        
+        return True
+    
+    def _get_common_dict_structure(self, dict_list: List[Dict]) -> Dict[str, Any]:
+        """Extract the common structure from a list of dictionaries."""
+        if not dict_list:
+            return {}
+        
+        if len(dict_list) == 1:
+            return dict_list[0]
+        
+        # Find all keys present in any dictionary
+        all_keys = set()
+        for item in dict_list:
+            all_keys.update(item.keys())
+        
+        # Create a structure with sample values for each key
+        common_structure = {}
+        for key in all_keys:
+            # Find the first non-null example of this key
+            for item in dict_list:
+                if key in item and item[key] is not None:
+                    common_structure[key] = item[key]
+                    break
+            else:
+                # If no non-null value found, use None
+                common_structure[key] = None
+        
+        return common_structure
     
     def late_handle(self, type: str) -> bool:
         if type in ['list', 'List', 'dict', 'Dict']:
