@@ -92,166 +92,193 @@ class ConfigManager:
 
         
 class ConfigKeysGenerator:
-    """Generates configuration keys from the current raw configuration."""
+    """Generates configuration keys from the current raw configuration (arbitrary depth)."""
     
     def __init__(self, raw_config: Dict[str, Any] = None):
-        self.raw_config = raw_config
-        
+        self.raw_config = raw_config or {}
+        # Track emitted classes to avoid duplicates (use fully-qualified names)
+        self._emitted: set[str] = set()
+    
     def generate(self):
-        """Generate configuration keys from a predefined source."""
-
-        new_str = f"from dataclasses import dataclass\n"
-        new_str += "from typing import List, Optional, Dict, Any\n"
-        new_str += "from managers.config_manager.config_manager import ConfigManager\n\n"
-        new_str += self._generate("ConfigKeys", self.raw_config)
-
-        # Save config_keys.py in the same directory as this file
+        header = (
+            "from dataclasses import dataclass\n"
+            "from typing import List, Optional, Dict, Any\n"
+            "from managers.config_manager.config_manager import ConfigManager\n\n"
+        )
+        body = self._emit_class(
+            class_name="ConfigKeys",
+            node=self.raw_config,
+            indent_count=0,
+            path=["ConfigKeys"],
+            is_root=True,
+            parents=[],
+        )
+        out = header + body
         config_keys_path = os.path.join(current_dir, 'config_keys.py')
         os.makedirs(os.path.dirname(config_keys_path), exist_ok=True)
-        
-        with open(config_keys_path, 'w') as file:
-            file.write(new_str)
-
-    def _generate(self, class_name: str = None, raw_config: Dict[str, Any] = None, indent_count: int = 0):
-        """Generate configuration keys from the current raw configuration."""
-        indent = "\t" * indent_count
-        new_str = indent + f"@dataclass\n"
-        new_str += indent + f"class {class_name}:\n"
-        late_handles = False
-        list_classes = {}  # Track classes generated for lists of dicts
-
-        for key, value in raw_config.items():
-            cleansed_value = self.value_cleanse(value)
-            cleansed_type = self.type_cleanse(value)
-            
-            if self.late_handle(cleansed_type):
-                late_handles = True
-                if cleansed_type in ['dict', 'Dict']:
-                    continue
-                elif cleansed_type in ['list', 'List'] and self._is_list_of_dicts_with_common_keys(value):
-                    # Generate a common class for list of dicts with common keys
-                    item_class_name = f"{key}_item"
-                    list_classes[key] = item_class_name
-                    new_str += indent + f"\t{key}: Optional[List['{item_class_name}']] = None\n"
-                    continue
-                
-            new_str += indent + f"\t{key}: Optional[{cleansed_type}] = {cleansed_value}\n"
-
-        new_str += indent + "\tpass\n"
-        
-        if late_handles:
-            new_str += indent + "\n"
-            
-            # Generate classes for lists of dicts with common keys
-            for key, item_class_name in list_classes.items():
-                common_structure = self._get_common_dict_structure(raw_config[key])
-                new_str += f"{self._generate(item_class_name, common_structure, indent_count + 1)}\n"
-            
-            # Generate classes for regular dicts
-            for key, value in raw_config.items():
-                if isinstance(value, dict) or isinstance(value, Dict):
-                    new_str += f"{self._generate(f"{key}_class", value, indent_count + 1)}\n"
-                    
-            new_str += indent + "\tdef __init__(self):\n"
-            for key, value in raw_config.items():
-                if isinstance(value, list) or isinstance(value, List):
-                    if key in list_classes:
-                        # For lists of dicts with common keys, create list of class instances
-                        # Use unified approach for both simple and complex structures
-                        new_str += indent + f"\t\tself.{key} = []\n"
-                        new_str += indent + f"\t\tfor item_data in {value}:\n"
-                        new_str += indent + f"\t\t\titem_instance = self.{list_classes[key]}()\n"
-                        new_str += indent + f"\t\t\tConfigManager._init_nested_item(item_instance, item_data)\n"
-                        new_str += indent + f"\t\t\tself.{key}.append(item_instance)\n"
-                    else:
-                        # For regular lists
-                        new_str += indent + f"\t\tself.{key} = {value}\n"
-                if isinstance(value, dict) or isinstance(value, Dict):
-                    new_str += indent + f"\t\tself.{key} = self.{key}_class()\n"
-            new_str += indent + "\t\tpass\n"
-            
-        return new_str
+        with open(config_keys_path, 'w') as f:
+            f.write(out)
     
-    def _is_list_of_dicts_with_common_keys(self, value: List) -> bool:
-        """Check if a list contains dictionaries with common keys."""
-        if not isinstance(value, list) or len(value) == 0:
-            return False
-        
-        # Check if all items are dictionaries
-        if not all(isinstance(item, dict) for item in value):
-            return False
-        
-        # Check if there are at least 2 items and they have common keys
-        if len(value) < 2:
-            return len(value) == 1 and isinstance(value[0], dict)  # Single dict is also valid
-        
-        # Get keys from first dict
-        first_keys = set(value[0].keys())
-        
-        # Check if all other dicts have the same keys (or subset)
-        for item in value[1:]:
-            if not isinstance(item, dict):
-                return False
-            # Allow for common subset of keys
-            if not first_keys.intersection(set(item.keys())):
-                return False
-        
-        return True
-    
-    def _get_common_dict_structure(self, dict_list: List[Dict]) -> Dict[str, Any]:
-        """Extract the common structure from a list of dictionaries."""
-        if not dict_list:
-            return {}
-        
-        if len(dict_list) == 1:
-            return dict_list[0]
-        
-        # Find all keys present in any dictionary
-        all_keys = set()
-        for item in dict_list:
-            all_keys.update(item.keys())
-        
-        # Create a structure with sample values for each key
-        common_structure = {}
-        for key in all_keys:
-            # Find the first non-null example of this key
-            for item in dict_list:
-                if key in item and item[key] is not None:
-                    common_structure[key] = item[key]
-                    break
+    # ---------------- Internal helpers ----------------
+    def _tokenize(self, s: str) -> List[str]:
+        return ["".join(ch for ch in p if ch.isalnum()).lower() for p in s.replace('-', '_').split('_') if p]
+
+    def _to_camel(self, s: str) -> str:
+        """Convert tokens to full CamelCase without truncation."""
+        parts = self._tokenize(s)
+        if not parts:
+            return s.capitalize()
+        chunks: List[str] = []
+        for p in parts:
+            if p.isdigit():
+                chunks.append(p)
             else:
-                # If no non-null value found, use None
-                common_structure[key] = None
-        
-        return common_structure
-    
-    def late_handle(self, type: str) -> bool:
-        if type in ['list', 'List', 'dict', 'Dict']:
-            return True
-        return False
+                chunks.append(p.capitalize())
+        return ''.join(chunks)
 
-    def type_cleanse(self, key: str) -> str:
-        """Cleanses the type of a value for configuration keys."""
-        if isinstance(key, list):
-            return "List"
-        elif isinstance(key, dict):
-            return "Dict"
-        else:
-            return type(key).__name__
-        
-    def value_cleanse(self, value: Any) -> str:
-        """Cleanses the value of a configuration key."""
-        if isinstance(value, str):
-            return f'"{value}"'
-        elif isinstance(value, List) or isinstance(value, list):
-            return "None"
-        else:
-            return str(value)
+    def _apply_first_layer_suffix(self, base: str) -> str:
+        # Replace trailing Plugin/Util/Manager with _P/_U/_M
+        if base.endswith('Plugin'):
+            return base[:-len('Plugin')] + '_P'
+        if base.endswith('Util'):
+            return base[:-len('Util')] + '_U'
+        if base.endswith('Manager'):
+            return base[:-len('Manager')] + '_M'
+        return base
 
-if __name__ == "__main__":
-    cm = ConfigManager(verbose=False)
-    print("ConfigManager instance created successfully!")
+    def _short_class_name(self, current_class_name: str, key: str, kind: str, used_names: set[str] | None = None, is_first_layer: bool = False) -> str:
+        base = self._to_camel(key)
+        if kind == 'item':
+            base = f"{base}_I"
+        elif is_first_layer:
+            base = self._apply_first_layer_suffix(base)
+        # Ensure doesn't start with digit
+        if base and base[0].isdigit():
+            base = "C_" + base
+        # Ensure uniqueness among siblings
+        if used_names is not None:
+            name = base
+            n = 2
+            while name in used_names:
+                name = f"{base}{n}"
+                n += 1
+            used_names.add(name)
+            return name
+        return base
     
-    # Print some basic info
-    if hasattr(cm, 'raw_config'):
-        print(f"Loaded config keys: {list(cm.raw_config.keys())}")
+    def _is_list_of_dicts(self, value: Any) -> bool:
+        return isinstance(value, list) and len(value) > 0 and all(isinstance(it, dict) for it in value)
+    
+    def _union_dict_schema(self, lst: List[Dict[str, Any]]) -> Dict[str, Any]:
+        # Merge keys and pick a representative non-None value for type inference
+        keys: set[str] = set()
+        for it in lst:
+            keys.update(it.keys())
+        schema: Dict[str, Any] = {}
+        for k in keys:
+            rep = None
+            for it in lst:
+                if k in it and it[k] is not None:
+                    rep = it[k]
+                    break
+            schema[k] = rep
+        return schema
+    
+    def _emit_class(self, class_name: str, node: Any, indent_count: int, path: List[str], is_root: bool, parents: List[str] | None = None) -> str:
+        if parents is None:
+            parents = []
+        fqcn = ".".join(parents + [class_name]) if parents else class_name
+        # Avoid emitting same class twice (track by fully-qualified name)
+        if fqcn in self._emitted:
+            return ""
+        self._emitted.add(fqcn)
+        
+        indent = "\t" * indent_count
+        out: List[str] = []
+        out.append(f"{indent}@dataclass")
+        out.append(f"{indent}class {class_name}:")
+        
+        # Fields
+        nested_chunks: List[str] = []
+        used_names: set[str] = set()
+        if isinstance(node, dict):
+            for key, val in node.items():
+                is_first_layer = (class_name == 'ConfigKeys')
+                if isinstance(val, dict):
+                    nested_cls = self._short_class_name(class_name, key, kind='class', used_names=used_names, is_first_layer=is_first_layer)
+                    out.append(f"{indent}\t{key}: Optional['{nested_cls}'] = None")
+                    nested_chunks.append(self._emit_class(nested_cls, val, indent_count + 1, path + [key], False, parents=parents + [class_name]))
+                elif self._is_list_of_dicts(val):
+                    item_schema = self._union_dict_schema(val)
+                    item_cls = self._short_class_name(class_name, key, kind='item', used_names=used_names, is_first_layer=is_first_layer)
+                    out.append(f"{indent}\t{key}: Optional[List['{item_cls}']] = None")
+                    nested_chunks.append(self._emit_class(item_cls, item_schema, indent_count + 1, path + [key, "item"], False, parents=parents + [class_name]))
+                else:
+                    py_type = type(val).__name__ if val is not None else 'Any'
+                    if isinstance(val, list):
+                        annotated = 'List'
+                        default = 'None'
+                    elif isinstance(val, dict):
+                        annotated = 'Dict'
+                        default = 'None'
+                    elif isinstance(val, str):
+                        annotated = 'str'
+                        default = f'"{val}"'
+                    else:
+                        annotated = py_type
+                        default = str(val)
+                    out.append(f"{indent}\t{key}: Optional[{annotated}] = {default}")
+        else:
+            # Non-dict nodes should not happen for a class root; still guard
+            out.append(f"{indent}\tpass")
+        
+        # Methods: from_raw and _populate (recursive construction)
+        out.append("")
+        out.append(f"{indent}\t@staticmethod")
+        out.append(f"{indent}\tdef from_raw(raw: Dict[str, Any] | None) -> '{class_name}':")
+        out.append(f"{indent}\t\tinst = {fqcn}()")
+        out.append(f"{indent}\t\tinst._populate(raw or {{}})")
+        out.append(f"{indent}\t\treturn inst")
+        out.append("")
+        out.append(f"{indent}\tdef _populate(self, data: Dict[str, Any]):")
+        if isinstance(node, dict) and node:
+            for key, val in node.items():
+                keyq = f"'{key}'"
+                is_first_layer = (class_name == 'ConfigKeys')
+                if isinstance(val, dict):
+                    nested_cls = self._short_class_name(class_name, key, kind='class', is_first_layer=is_first_layer)
+                    out.append(f"{indent}\t\tself.{key} = self.{nested_cls}.from_raw(data.get({keyq}, {{}}))")
+                elif self._is_list_of_dicts(val):
+                    item_cls = self._short_class_name(class_name, key, kind='item', is_first_layer=is_first_layer)
+                    out.append(f"{indent}\t\tself.{key} = []")
+                    out.append(f"{indent}\t\tfor __it in data.get({keyq}, []):")
+                    out.append(f"{indent}\t\t\tself.{key}.append(self.{item_cls}.from_raw(__it))")
+                else:
+                    out.append(f"{indent}\t\tself.{key} = data.get({keyq}, self.{key})")
+        else:
+            out.append(f"{indent}\t\tpass")
+        
+        # Root __init__ auto-populates from embedded literal
+        out.append("")
+        out.append(f"{indent}\tdef __init__(self):")
+        if is_root:
+            # Embed literal for root only
+            literal = self._literal(node)
+            out.append(f"{indent}\t\tself._populate({literal})")
+        else:
+            out.append(f"{indent}\t\tpass")
+        
+        # Append nested classes
+        out.append("")
+        for ch in nested_chunks:
+            if ch:
+                out.append(ch)
+        out.append("")
+        return "\n".join(out)
+    
+    def _literal(self, value: Any) -> str:
+        # Safe Python literal for embedding raw_config
+        try:
+            return repr(value)
+        except Exception:
+            return 'None'

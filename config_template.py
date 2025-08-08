@@ -10,6 +10,7 @@ project_root = os.getcwd()  # Use current working directory as project root
 sys.path.insert(0, project_root)
 
 from framework.modules_control import ModulesController
+from utils.logger_util.logger import get_logger
 
 
 class ConfigTemplate:
@@ -25,6 +26,7 @@ class ConfigTemplate:
         self.config_file_path = config_file_path
         self.modules_controller = ModulesController()
         self.consolidated_config: Dict[str, Any] = {}
+        self.logger = get_logger("ConfigTemplate")
     
     def find_config_templates(self) -> Dict[str, str]:
         """
@@ -36,19 +38,19 @@ class ConfigTemplate:
         config_templates = {}
         all_modules = self.modules_controller.get_all_modules()
         
-        print("🔍 Scanning modules for .config_template files...")
+        self.logger.info("Scanning modules for .config_template files...")
         
         for module_path, module_info in all_modules.items():
             config_template_path = os.path.join(module_path, ".config_template")
             
             if os.path.exists(config_template_path):
                 config_templates[module_info.name] = config_template_path
-                print(f"   ✅ Found template in {module_info.name}: {config_template_path}")
+                self.logger.info(f"Found template in {module_info.name}: {config_template_path}")
         
         if not config_templates:
-            print("   ⚠️  No .config_template files found in any modules")
+            self.logger.warning("No .config_template files found in any modules")
         else:
-            print(f"   📋 Total found: {len(config_templates)} template files")
+            self.logger.info(f"Total found: {len(config_templates)} template files")
         
         return config_templates
     
@@ -84,7 +86,7 @@ class ConfigTemplate:
                     return config_data if config_data else {"content": content}
                     
         except Exception as e:
-            print(f"   ❌ Error loading template {template_path}: {e}")
+            self.logger.error(f"Error loading template {template_path}: {e}")
             return {}
     
     def consolidate_configs(self) -> Dict[str, Any]:
@@ -94,20 +96,20 @@ class ConfigTemplate:
         Returns:
             Dict[str, Any]: Consolidated configuration with module names as keys
         """
-        print("\n🔧 Consolidating configuration templates...")
+        self.logger.info("Consolidating configuration templates...")
         
         config_templates = self.find_config_templates()
         consolidated = {}
         
         for module_name, template_path in config_templates.items():
-            print(f"\n📝 Processing {module_name}...")
+            self.logger.info(f"Processing {module_name}...")
             config_data = self.load_config_template(template_path)
             
             if config_data:
                 consolidated[module_name] = config_data
-                print(f"   ✅ Loaded {len(config_data)} configuration items")
+                self.logger.info(f"Loaded {len(config_data)} configuration items")
             else:
-                print(f"   ⚠️  No configuration data found")
+                self.logger.warning("No configuration data found")
         
         self.consolidated_config = consolidated
         return consolidated
@@ -120,23 +122,23 @@ class ConfigTemplate:
             bool: True if saved successfully, False otherwise
         """
         try:
-            print(f"\n💾 Saving consolidated config to {self.config_file_path}...")
+            self.logger.info(f"Saving consolidated config to {self.config_file_path}...")
             
             # Create a backup if the file already exists
             if os.path.exists(self.config_file_path):
                 backup_path = f"{self.config_file_path}.backup"
                 os.rename(self.config_file_path, backup_path)
-                print(f"   🔄 Created backup: {backup_path}")
+                self.logger.info(f"Created backup: {backup_path}")
             
             # Save the consolidated config as JSON (compatible with ConfigManager)
             with open(self.config_file_path, 'w') as file:
                 json.dump(self.consolidated_config, file, indent=2)
             
-            print(f"   ✅ Successfully saved {len(self.consolidated_config)} module configurations")
+            self.logger.info(f"Successfully saved {len(self.consolidated_config)} module configurations")
             return True
             
         except Exception as e:
-            print(f"   ❌ Error saving config file: {e}")
+            self.logger.error(f"Error saving config file: {e}")
             return False
     
     def load_existing_config(self) -> Dict[str, Any]:
@@ -156,7 +158,7 @@ class ConfigTemplate:
                     return {}
                 return json.loads(content)
         except json.JSONDecodeError as e:
-            print(f"Warning: Failed to parse JSON config file: {e}")
+            self.logger.warning(f"Failed to parse JSON config file: {e}")
             # Try to parse as key=value format as fallback
             try:
                 with open(self.config_file_path, 'r') as file:
@@ -171,7 +173,7 @@ class ConfigTemplate:
             except Exception:
                 return {}
         except Exception as e:
-            print(f"Warning: Failed to load existing config: {e}")
+            self.logger.warning(f"Failed to load existing config: {e}")
             return {}
     
     def merge_with_existing(self, preserve_existing: bool = True) -> Dict[str, Any]:
@@ -217,40 +219,39 @@ class ConfigTemplate:
         Returns:
             bool: True if successful, False otherwise
         """
-        print("🚀 Starting configuration template processing...")
+        self.logger.info("Starting configuration template processing...")
         
         try:
             if preserve_existing and os.path.exists(self.config_file_path):
-                print("🔄 Merging with existing configuration...")
+                self.logger.info("Merging with existing configuration...")
                 self.merge_with_existing(preserve_existing=True)
             else:
-                print("📋 Creating new configuration...")
+                self.logger.info("Creating new configuration...")
                 self.consolidate_configs()
             
             success = self.save_consolidated_config()
             
             if success:
-                print(f"\n🎉 Configuration processing complete!")
-                print(f"📁 Config file: {self.config_file_path}")
-                print(f"📦 Modules processed: {len(self.consolidated_config)}")
+                self.logger.info("Configuration processing complete!")
+                self.logger.info(f"Config file: {self.config_file_path}")
+                self.logger.info(f"Modules processed: {len(self.consolidated_config)}")
             
             return success
             
         except Exception as e:
-            print(f"❌ Error during config generation: {e}")
+            self.logger.error(f"Error during config generation: {e}")
             return False
     
     def list_config_summary(self):
         """Print a summary of the consolidated configuration."""
         if not self.consolidated_config:
-            print("No configuration data available. Run generate_config() first.")
+            self.logger.warning("No configuration data available. Run generate_config() first.")
             return
         
-        print(f"\n📊 Configuration Summary:")
-        print("=" * 60)
+        self.logger.info("Configuration Summary:")
         
         for module_name, config_data in self.consolidated_config.items():
-            print(f"📁 {module_name} ✅")
+            self.logger.info(f"{module_name} ✅")
 
 def main():
     """Main function for testing ConfigTemplate."""
@@ -263,7 +264,10 @@ def main():
         # Show summary
         config_template.list_config_summary()
     else:
-        print("Failed to generate configuration.")
+        # Using print here is acceptable for direct script invocation, but keep consistent
+        # with logging for now.
+        logger = get_logger("ConfigTemplateMain")
+        logger.error("Failed to generate configuration.")
 
 
 if __name__ == "__main__":

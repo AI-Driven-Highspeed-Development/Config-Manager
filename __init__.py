@@ -25,6 +25,10 @@ try:
 except ImportError:
     from config_manager import ConfigManager
     from config_template import ConfigTemplate
+
+from utils.logger_util.logger import get_logger
+
+logger = get_logger("ConfigManagerInit")
     
 config_template = ConfigTemplate()
 
@@ -34,6 +38,6 @@ if success:
     # Show summary
     config_template.list_config_summary()
 else:
-    print("Failed to generate configuration.")
+    logger.error("Failed to generate configuration.")
 
 cm = ConfigManager(verbose=False)
