@@ -1,6 +1,6 @@
 version: 0.0.2
 folder_path: managers/config_manager
-type: managers
+type: manager
 
 requirements: 
   - https://github.com/AI-Driven-Highspeed-Development/Logger-Util.git
