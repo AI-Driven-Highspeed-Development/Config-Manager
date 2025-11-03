@@ -1,36 +1,45 @@
-# AI Driven Highspeed Development Framework Module — Config Manager
+# Config Manager
+
+Small, singleton JSON configuration system with automatic code generation for strongly‑typed access. Reads `./.config`, generates key classes, exposes `cm.config`, and supports runtime save/regeneration.
 
 ## Overview
-A singleton JSON configuration system with automatic code generation. On initialization, it reads `./.config`, generates strongly-typed access classes, and exposes `cm.config` for type-safe reads. Supports runtime load/save with regeneration of key classes.
+- Singleton instance providing project‑wide config access
+- Auto‑generates typed accessors from your JSON config
+- Load/save at runtime; regenerates key classes on demand
+- Discovers module `.config_template` files and consolidates them into a single `.config`
 
-## Capabilities
-- Auto-generates config key classes from JSON on initialization
-- Singleton pattern (single application instance)
-- Type-safe config access via generated dataclasses
-- Automatic nested structure handling (arbitrary depth)
-- Runtime config loading and saving with regeneration
-- Works from current working directory as project root
+## Features
+- Strongly‑typed access
+  - Generates nested dataclasses mirroring your JSON
+  - Handles lists of dicts with synthesized item dataclasses
+- Lifecycle and regeneration
+  - Ensures `./.config` exists; creates if missing
+  - Regenerates `config_keys.py` on initialization and on `save_config(...)`
+- Template consolidation
+  - Scans modules for `.config_template` and merges into one file
+  - Preserves existing values by default (`preserve_existing=True`)
 
-## Components
-### ConfigManager
-Responsible for loading, generating, and exposing strongly-typed configuration accessors.
-- Ensures `.config` exists (creates if missing)
-- Loads JSON into memory as `raw_config`
-- Invokes `ConfigKeysGenerator.generate()` to emit `config_keys.py`
-- Instantiates `ConfigKeys` and exposes it as `cm.config`
-- On `save_config()`, updates the JSON file and regenerates classes
+## Quickstart
 
-### ConfigTemplate
-Discovers module templates and consolidates them into a single project configuration.
-- Discovery: Scans modules and locates `.config_template` files
-- Load: Reads JSON templates
-- Consolidate: Builds a single dictionary keyed by module name
-- Merge: Preserves existing values by default (`preserve_existing=True`)
-- Backup: Creates `.config.backup` before overwriting
-- Save: Writes the consolidated configuration to `./.config`
-- CLI: Refresh via `python adhd_cli.py refresh config_manager`
+```python
+from managers.config_manager.config_manager import ConfigManager
 
-Example (programmatic generation):
+# Initialize (singleton)
+cm = ConfigManager(config_path='.config', verbose=True)
+
+# Read values (typed access)
+host = cm.config.database.host
+port = cm.config.database.port
+
+# Update and persist (regenerates keys)
+cm.save_config({"database": {"host": "db.local", "port": 5433}})
+
+# Singleton guarantee
+assert ConfigManager() is cm
+```
+
+### Generate `.config` from module templates
+
 ```python
 from managers.config_manager import ConfigTemplate
 
@@ -39,100 +48,48 @@ ct.generate_config(preserve_existing=True)
 ct.list_config_summary()
 ```
 
-## Lifecycle (How It Works)
-1. First construction `ConfigManager(config_path='.config')`:
-   - Ensures `.config` exists
-   - Loads JSON into memory as `raw_config`
-   - Generates `config_keys.py` and instantiates `cm.config`
-2. Save/update: `cm.save_config({...})` persists changes and regenerates keys
+## API
 
-Generated classes use nested dataclasses and optional lists to mirror your JSON structure. Class names are synthesized from keys, with first-level suffix rules for Plugin/Util/Manager.
-
-## Quick Start
 ```python
-from managers.config_manager.config_manager import ConfigManager
+class ConfigManager:
+    def __init__(self, config_path: str = '.config', verbose: bool = False): ...
+    @property
+    def config(self): ...  # generated typed accessors root
+    def save_config(self, updates: dict) -> None: ...  # persists JSON and regenerates keys
 
-# Initialize (singleton)
-cm = ConfigManager(config_path='.config', verbose=True)
-
-# Access values (type-safe)
-host = cm.config.database.host
-port = cm.config.database.port
-
-# Update and persist (regenerates keys)
-cm.save_config({"database": {"host": "db.local", "port": 5433}})
-
-# Singleton guarantee
-cm1 = ConfigManager()
-cm2 = ConfigManager()
-assert cm1 is cm2
+class ConfigTemplate:
+    def generate_config(self, preserve_existing: bool = True) -> None: ...
+    def list_config_summary(self) -> None: ...
 ```
 
-## Examples
-### API Usage (code)
-```python
-from managers.config_manager.config_manager import ConfigManager
-
-# Initialize
-cm = ConfigManager(config_path='.config')
-
-# Get a simple value
-api_key = cm.config.api_key
-
-# Update nested structure
-cm.save_config({"webcam_plugin": {"devices": [{"name": "cam01", "device_id": 0}]}})
-
-# Iterate list items (generated list-of-dicts)
-for dev in cm.config.webcam_plugin.devices or []:
-    print(dev.name, dev.device_id)
-```
-
-### Config JSON (data)
-```json
-{
-  "webcam_plugin": {
-    "devices": [
-      {"name": "cam01", "device_id": 0},
-      {"name": "cam02", "device_id": 1}
-    ]
-  },
-  "yolo_pose_plugin": {
-    "model_name": "yolo11x-pose.pt",
-    "confidence_threshold": 0.5
-  }
-}
-```
-
-## CLI and Regeneration
-- Manual edits to `./.config` require regeneration of `config_keys.py`.
-- Do one of:
-  1) Reinitialize: `cm = ConfigManager()` (singleton updates)
-  2) Use ADHD CLI: `python adhd_cli.py refresh config_manager`
-
-## Module File Layout
-- `managers/config_manager/config_manager.py` — Singleton, I/O, generator driver
-- `managers/config_manager/config_keys.py` — Generated dataclasses (do not edit manually)
-- `managers/config_manager/agent_instruction.md` — This document
-- `./.config` — Project JSON config
-
-## Implementation Notes
-- Class naming: keys → CamelCase; first layer applies `_P`/`_U`/`_M` if ending with Plugin/Util/Manager
-- Lists of dicts generate an item dataclass based on the union schema across items
-- Regeneration overwrites `config_keys.py`
+Notes
+- Class naming: keys → CamelCase; first‑level keys may append `_P`/`_U`/`_M` suffixes for Plugin/Util/Manager.
+- Lists of dicts combine union schemas to derive item shapes.
+- Regeneration overwrites `config_keys.py` (don’t edit it manually).
 
 ## Troubleshooting
-- `ImportError` for generated keys: Ensure you instantiated `ConfigManager` at least once to generate `config_keys.py`
-- Changes not reflected: Call `cm.save_config(...)` or reinitialize `ConfigManager()`
-- JSON parse errors: Validate `.config` is valid JSON
-- Path issues in embedded environments: Module uses `os.getcwd()` as project root and adjusts `sys.path` accordingly
+- Import errors for generated keys: Ensure you initialized `ConfigManager()` at least once.
+- Changes not reflected: Call `cm.save_config(...)` or reinitialize `ConfigManager()`.
+- JSON parse errors: Confirm `.config` is valid JSON.
+- Path issues: The module assumes `os.getcwd()` is your project root.
 
-## Warnings
-- Regeneration overwrites `config_keys.py`. Do not manually edit it
-- Manual `.config` edits require refresh as described above to keep classes in sync
+## Requirements & prerequisites
+- Python standard library only for manager logic; generated classes are pure Python.
 
-## Related Files
-- `.config` — Main configuration file at project root
+## Module structure
 
-## Versioning & Maintenance
-- Intended to remain backward compatible for JSON structures; breaking changes only if `.config` layout fundamentally changes
-- Keep this document updated when adding generator rules
+```
+managers/config_manager/
+├─ __init__.py             # package exports
+├─ config_manager.py       # singleton manager and generation driver
+├─ config_template.py      # templates discovery and consolidation
+├─ config_keys.py          # generated dataclasses (do not edit)
+├─ refresh.py              # CLI hook to refresh/regenerate
+├─ init.yaml               # module metadata
+└─ README.md               # this file
+```
+
+## See also
+- YAML Reading Core: parse and validate YAML files you might convert to JSON config
+- Logger Utility: standardized logging for config operations
+- Temp Files Manager: create temporary workspaces for config generation steps
