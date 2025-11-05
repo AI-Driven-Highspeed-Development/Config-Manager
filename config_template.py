@@ -10,7 +10,7 @@ project_root = os.getcwd()  # Use current working directory as project root
 sys.path.insert(0, project_root)
 
 from framework.modules_control import ModulesController
-from utils.logger_util.logger import get_logger
+from utils.logger_util.logger import Logger
 
 
 class ConfigTemplate:
@@ -26,7 +26,7 @@ class ConfigTemplate:
         self.config_file_path = config_file_path
         self.modules_controller = ModulesController()
         self.consolidated_config: Dict[str, Any] = {}
-        self.logger = get_logger("ConfigTemplate")
+        self.logger = Logger(name="ConfigTemplate")
     
     def find_config_templates(self) -> Dict[str, str]:
         """
@@ -266,8 +266,7 @@ def main():
     else:
         # Using print here is acceptable for direct script invocation, but keep consistent
         # with logging for now.
-        logger = get_logger("ConfigTemplateMain")
-        logger.error("Failed to generate configuration.")
+        Logger(name="ConfigTemplateMain").error("Failed to generate configuration.")
 
 
 if __name__ == "__main__":

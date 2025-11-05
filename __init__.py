@@ -26,9 +26,9 @@ except ImportError:
     from config_manager import ConfigManager
     from config_template import ConfigTemplate
 
-from utils.logger_util.logger import get_logger
+from utils.logger_util.logger import Logger
 
-logger = get_logger("ConfigManagerInit")
+logger = Logger(name="ConfigManagerInit")
     
 config_template = ConfigTemplate()
 

@@ -9,7 +9,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.getcwd()  # Use current working directory as project root
 sys.path.insert(0, project_root)
 
-from utils.logger_util.logger import get_logger
+from utils.logger_util.logger import Logger
 
 # Run this file once to generate config keys
 # Run this file again if you changed the .config file
@@ -28,8 +28,8 @@ class ConfigManager:
             return
         self._initialized = True
         
-        # Use centralized logger instead of internal setup
-        self.logger = get_logger("ConfigManager", verbose=verbose)
+        # Use centralized Logger wrapper (per-name singleton)
+        self.logger = Logger(name="ConfigManager", verbose=verbose)
         self.config_path = config_path
         self.verbose = verbose
         
