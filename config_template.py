@@ -38,19 +38,19 @@ class ConfigTemplate:
         config_templates = {}
         all_modules = self.modules_controller.get_all_modules()
         
-        self.logger.info("Scanning modules for .config_template files...")
+        self.logger.debug("Scanning modules for .config_template files...")
         
         for module_path, module_info in all_modules.items():
             config_template_path = os.path.join(module_path, ".config_template")
             
             if os.path.exists(config_template_path):
                 config_templates[module_info.name] = config_template_path
-                self.logger.info(f"Found template in {module_info.name}: {config_template_path}")
+                self.logger.debug(f"Found template in {module_info.name}: {config_template_path}")
         
         if not config_templates:
             self.logger.warning("No .config_template files found in any modules")
         else:
-            self.logger.info(f"Total found: {len(config_templates)} template files")
+            self.logger.debug(f"Total found: {len(config_templates)} template files")
         
         return config_templates
     
@@ -96,18 +96,18 @@ class ConfigTemplate:
         Returns:
             Dict[str, Any]: Consolidated configuration with module names as keys
         """
-        self.logger.info("Consolidating configuration templates...")
+        self.logger.debug("Consolidating configuration templates...")
         
         config_templates = self.find_config_templates()
         consolidated = {}
         
         for module_name, template_path in config_templates.items():
-            self.logger.info(f"Processing {module_name}...")
+            self.logger.debug(f"Processing {module_name}...")
             config_data = self.load_config_template(template_path)
             
             if config_data:
                 consolidated[module_name] = config_data
-                self.logger.info(f"Loaded {len(config_data)} configuration items")
+                self.logger.debug(f"Loaded {len(config_data)} configuration items")
             else:
                 self.logger.warning("No configuration data found")
         
@@ -122,13 +122,13 @@ class ConfigTemplate:
             bool: True if saved successfully, False otherwise
         """
         try:
-            self.logger.info(f"Saving consolidated config to {self.config_file_path}...")
+            self.logger.debug(f"Saving consolidated config to {self.config_file_path}...")
             
             # Create a backup if the file already exists
             if os.path.exists(self.config_file_path):
                 backup_path = f"{self.config_file_path}.backup"
                 os.rename(self.config_file_path, backup_path)
-                self.logger.info(f"Created backup: {backup_path}")
+                self.logger.debug(f"Created backup: {backup_path}")
             
             # Save the consolidated config as JSON (compatible with ConfigManager)
             with open(self.config_file_path, 'w') as file:
@@ -223,7 +223,7 @@ class ConfigTemplate:
         
         try:
             if preserve_existing and os.path.exists(self.config_file_path):
-                self.logger.info("Merging with existing configuration...")
+                self.logger.debug("Merging with existing configuration...")
                 self.merge_with_existing(preserve_existing=True)
             else:
                 self.logger.info("Creating new configuration...")
@@ -233,7 +233,7 @@ class ConfigTemplate:
             
             if success:
                 self.logger.info("Configuration processing complete!")
-                self.logger.info(f"Config file: {self.config_file_path}")
+                self.logger.debug(f"Config file: {self.config_file_path}")
                 self.logger.info(f"Modules processed: {len(self.consolidated_config)}")
             
             return success
