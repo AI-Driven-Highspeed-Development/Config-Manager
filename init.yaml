@@ -1,6 +1,7 @@
 version: 0.0.2
 folder_path: managers/config_manager
 type: manager
+repo_url: https://github.com/AI-Driven-Highspeed-Development/Config-Manager.git
 
 requirements: 
   - https://github.com/AI-Driven-Highspeed-Development/Logger-Util.git

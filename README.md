@@ -12,6 +12,7 @@ Small, singleton JSON configuration system with automatic code generation for st
 - Strongly‑typed access
   - Generates nested dataclasses mirroring your JSON
   - Handles lists of dicts with synthesized item dataclasses
+  - Also exposes the raw dict for each node via `___DATA___`
 - Lifecycle and regeneration
   - Ensures `./.config` exists; creates if missing
   - Regenerates `config_keys.py` on initialization and on `save_config(...)`
@@ -28,8 +29,12 @@ from managers.config_manager.config_manager import ConfigManager
 cm = ConfigManager(config_path='.config', verbose=True)
 
 # Read values (typed access)
-host = cm.config.database.host
-port = cm.config.database.port
+some_value = cm.config.section.subsection.leaf
+
+# When you need mapping behavior, use the raw dict or helper
+node = cm.config.section
+value = node.dict_get("arbitrary_key", default=None)
+value2 = node.___DATA___["arbitrary_key"]  # raises KeyError if missing
 
 # Update and persist (regenerates keys)
 cm.save_config({"database": {"host": "db.local", "port": 5433}})
@@ -62,19 +67,20 @@ class ConfigTemplate:
     def list_config_summary(self) -> None: ...
 ```
 
-Notes
+## Notes
 - Class naming: keys → CamelCase; first‑level keys may append `_P`/`_U`/`_M` suffixes for Plugin/Util/Manager.
 - Lists of dicts combine union schemas to derive item shapes.
 - Regeneration overwrites `config_keys.py` (don’t edit it manually).
+- Dict access: each generated class has `___DATA___: Dict[str, Any]` capturing the raw JSON for direct mapping access.
+
+## Requirements & prerequisites
+- Python standard library only for manager logic; generated classes are pure Python.
 
 ## Troubleshooting
 - Import errors for generated keys: Ensure you initialized `ConfigManager()` at least once.
 - Changes not reflected: Call `cm.save_config(...)` or reinitialize `ConfigManager()`.
 - JSON parse errors: Confirm `.config` is valid JSON.
 - Path issues: The module assumes `os.getcwd()` is your project root.
-
-## Requirements & prerequisites
-- Python standard library only for manager logic; generated classes are pure Python.
 
 ## Module structure
 

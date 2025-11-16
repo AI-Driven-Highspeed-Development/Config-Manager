@@ -188,16 +188,25 @@ class ConfigKeysGenerator:
         if parents is None:
             parents = []
         fqcn = ".".join(parents + [class_name]) if parents else class_name
-        # Avoid emitting same class twice (track by fully-qualified name)
         if fqcn in self._emitted:
             return ""
         self._emitted.add(fqcn)
-        
+
         indent = "\t" * indent_count
         out: List[str] = []
         out.append(f"{indent}@dataclass")
         out.append(f"{indent}class {class_name}:")
-        
+        out.append(f"{indent}\t___DATA___: Dict[str, Any] | None = None")
+        out.append(f"{indent}\tdef dict_get(self, key: str, default: Any = None) -> Any:")
+        out.append(f"{indent}\t\t'""Dictionary-style access to raw data. Prefer typed attributes when possible.""'")
+        out.append(f"{indent}\t\tif self.___DATA___ is None:")
+        out.append(f"{indent}\t\t\treturn default")
+        out.append(f"{indent}\t\treturn self.___DATA___.get(key, default)")
+        out.append(f"{indent}\tdef __getitem__(self, key: str) -> Any:")
+        out.append(f"{indent}\t\tif self.___DATA___ is None or key not in self.___DATA___:")
+        out.append(f"{indent}\t\t\traise KeyError(key)")
+        out.append(f"{indent}\t\treturn self.___DATA___[key]")
+
         # Fields
         nested_chunks: List[str] = []
         used_names: set[str] = set()
@@ -212,7 +221,7 @@ class ConfigKeysGenerator:
                     item_schema = self._union_dict_schema(val)
                     item_cls = self._short_class_name(class_name, key, kind='item', used_names=used_names, is_first_layer=is_first_layer)
                     out.append(f"{indent}\t{key}: Optional[List['{item_cls}']] = None")
-                    nested_chunks.append(self._emit_class(item_cls, item_schema, indent_count + 1, path + [key, "item"], False, parents=parents + [class_name]))
+                    nested_chunks.append(self._emit_class(item_cls, item_schema, indent_count + 1, path + [key, 'item'], False, parents=parents + [class_name]))
                 else:
                     py_type = type(val).__name__ if val is not None else 'Any'
                     if isinstance(val, list):
@@ -229,18 +238,19 @@ class ConfigKeysGenerator:
                         default = str(val)
                     out.append(f"{indent}\t{key}: Optional[{annotated}] = {default}")
         else:
-            # Non-dict nodes should not happen for a class root; still guard
             out.append(f"{indent}\tpass")
-        
-        # Methods: from_raw and _populate (recursive construction)
+
+        # Methods
         out.append("")
         out.append(f"{indent}\t@staticmethod")
         out.append(f"{indent}\tdef from_raw(raw: Dict[str, Any] | None) -> '{class_name}':")
         out.append(f"{indent}\t\tinst = {fqcn}()")
+        out.append(f"{indent}\t\tinst.___DATA___ = raw or {{}}")
         out.append(f"{indent}\t\tinst._populate(raw or {{}})")
         out.append(f"{indent}\t\treturn inst")
         out.append("")
         out.append(f"{indent}\tdef _populate(self, data: Dict[str, Any]):")
+        out.append(f"{indent}\t\tself.___DATA___ = data")
         if isinstance(node, dict) and node:
             for key, val in node.items():
                 keyq = f"'{key}'"
@@ -257,18 +267,15 @@ class ConfigKeysGenerator:
                     out.append(f"{indent}\t\tself.{key} = data.get({keyq}, self.{key})")
         else:
             out.append(f"{indent}\t\tpass")
-        
-        # Root __init__ auto-populates from embedded literal
+
         out.append("")
         out.append(f"{indent}\tdef __init__(self):")
         if is_root:
-            # Embed literal for root only
             literal = self._literal(node)
             out.append(f"{indent}\t\tself._populate({literal})")
         else:
             out.append(f"{indent}\t\tpass")
-        
-        # Append nested classes
+
         out.append("")
         for ch in nested_chunks:
             if ch:
