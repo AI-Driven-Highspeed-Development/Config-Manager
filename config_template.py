@@ -9,7 +9,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.getcwd()  # Use current working directory as project root
 sys.path.insert(0, project_root)
 
-from framework.modules_control import ModulesController
+from cores.modules_controller_core.modules_controller import ModulesController
 from utils.logger_util.logger import Logger
 
 
@@ -24,7 +24,7 @@ class ConfigTemplate:
             config_file_path: Path to the main config file (default: ".config")
         """
         self.config_file_path = config_file_path
-        self.modules_controller = ModulesController()
+        self.modules_controller = ModulesController(Path.cwd())
         self.consolidated_config: Dict[str, Any] = {}
         self.logger = Logger(name="ConfigTemplate")
     
@@ -35,17 +35,22 @@ class ConfigTemplate:
         Returns:
             Dict[str, str]: Dictionary mapping module names to their config template file paths
         """
-        config_templates = {}
-        all_modules = self.modules_controller.get_all_modules()
-        
+        config_templates: Dict[str, str] = {}
+        report = self.modules_controller.list_all_modules()
+        if not report.modules:
+            self.logger.warning("ModulesController returned no modules to scan for config templates.")
+            return config_templates
+
         self.logger.debug("Scanning modules for .config_template files...")
-        
-        for module_path, module_info in all_modules.items():
-            config_template_path = os.path.join(module_path, ".config_template")
-            
-            if os.path.exists(config_template_path):
-                config_templates[module_info.name] = config_template_path
-                self.logger.debug(f"Found template in {module_info.name}: {config_template_path}")
+
+        for module in report.modules:
+            config_template_path = module.path / ".config_template"
+
+            if config_template_path.exists():
+                config_templates[module.name] = str(config_template_path)
+                self.logger.debug(
+                    f"Found template in {module.name}: {config_template_path}"
+                )
         
         if not config_templates:
             self.logger.warning("No .config_template files found in any modules")
