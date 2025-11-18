@@ -5,3 +5,4 @@ repo_url: https://github.com/AI-Driven-Highspeed-Development/Config-Manager.git
 
 requirements: 
   - https://github.com/AI-Driven-Highspeed-Development/Logger-Util.git
+  - https://github.com/AI-Driven-Highspeed-Development/modules_controller_core.git
