@@ -253,10 +253,10 @@ class ConfigTemplate:
             self.logger.warning("No configuration data available. Run generate_config() first.")
             return
         
-        self.logger.info("Configuration Summary:")
+        self.logger.debug("Configuration Summary:")
         
         for module_name, config_data in self.consolidated_config.items():
-            self.logger.info(f"{module_name} ✅")
+            self.logger.debug(f"{module_name} ✅")
 
 def main():
     """Main function for testing ConfigTemplate."""
