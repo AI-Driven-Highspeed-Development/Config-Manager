@@ -115,8 +115,19 @@ class ConfigKeysGenerator:
         out = header + body
         config_keys_path = os.path.join(current_dir, 'config_keys.py')
         os.makedirs(os.path.dirname(config_keys_path), exist_ok=True)
-        with open(config_keys_path, 'w') as f:
-            f.write(out)
+        
+        # Only write if content has changed (prevents uvicorn reload loops)
+        existing_content = None
+        if os.path.exists(config_keys_path):
+            try:
+                with open(config_keys_path, 'r') as f:
+                    existing_content = f.read()
+            except Exception:
+                pass  # If read fails, regenerate
+        
+        if existing_content != out:
+            with open(config_keys_path, 'w') as f:
+                f.write(out)
     
     # ---------------- Internal helpers ----------------
     def _tokenize(self, s: str) -> List[str]:
