@@ -1,0 +1,20 @@
+[project]
+name = "config-manager"
+version = "0.0.2"
+description = "ADHD Framework manager: config_manager"
+requires-python = ">=3.11"
+dependencies = [
+    "logger-util",
+    "modules-controller-core",
+]
+
+[tool.adhd]
+type = "manager"
+layer = "runtime"
+
+[tool.uv.sources]
+logger-util = { workspace = true }
+modules-controller-core = { workspace = true }
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
