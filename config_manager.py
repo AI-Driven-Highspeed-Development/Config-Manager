@@ -1,14 +1,8 @@
 import json
 import os
-import sys
 from typing import Any, Dict, List
 
-# Add path handling to work from the new nested directory structure
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.getcwd()  # Use current working directory as project root
-sys.path.insert(0, project_root)
-
-from utils.logger_util.logger import Logger
+from logger_util import Logger
 
 # Run this file once to generate config keys
 # Run this file again if you changed the .config file
@@ -44,7 +38,7 @@ class ConfigManager:
         self.ckg = ConfigKeysGenerator(self.raw_config)
         self.ckg.generate()
         
-        from managers.config_manager.config_keys import ConfigKeys
+        from .config_keys import ConfigKeys
         self.config = ConfigKeys()
 
     @staticmethod
@@ -102,7 +96,7 @@ class ConfigKeysGenerator:
         header = (
             "from dataclasses import dataclass\n"
             "from typing import List, Optional, Dict, Any\n"
-            "from managers.config_manager.config_manager import ConfigManager\n\n"
+            "from config_manager import ConfigManager\n\n"
         )
         body = self._emit_class(
             class_name="ConfigKeys",
@@ -113,6 +107,7 @@ class ConfigKeysGenerator:
             parents=[],
         )
         out = header + body
+        current_dir = os.path.dirname(os.path.abspath(__file__))
         config_keys_path = os.path.join(current_dir, 'config_keys.py')
         os.makedirs(os.path.dirname(config_keys_path), exist_ok=True)
         

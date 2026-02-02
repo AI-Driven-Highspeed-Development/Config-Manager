@@ -5,7 +5,7 @@ A centralized configuration management utility for ADHD project template.
 Provides singleton-based configuration management with automatic key generation.
 
 Usage:
-    from managers.config_manager import ConfigManager
+    from config_manager import ConfigManager
     
     ## Basic usage
     cm = ConfigManager()
@@ -19,14 +19,10 @@ Usage:
     raw_data = cm.raw_config
 """
 
-try:
-    from .config_manager import ConfigManager
-    from .config_template import ConfigTemplate
-except ImportError:
-    from config_manager import ConfigManager
-    from config_template import ConfigTemplate
+from .config_manager import ConfigManager
+from .config_template import ConfigTemplate
 
-from utils.logger_util.logger import Logger
+from logger_util import Logger
 
 logger = Logger(name="ConfigManagerInit")
     
