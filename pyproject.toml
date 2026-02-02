@@ -15,6 +15,10 @@ Repository = "https://github.com/AI-Driven-Highspeed-Development/config-manager.
 type = "manager"
 layer = "runtime"
 
+[tool.uv.sources]
+logger-util = { git = "https://github.com/AI-Driven-Highspeed-Development/Logger-Util.git" }
+modules-controller-core = { git = "https://github.com/AI-Driven-Highspeed-Development/modules_controller_core.git" }
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
