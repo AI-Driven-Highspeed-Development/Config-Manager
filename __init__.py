@@ -22,18 +22,4 @@ Usage:
 from .config_manager import ConfigManager
 from .config_template import ConfigTemplate
 
-from logger_util import Logger
-
-logger = Logger(name="ConfigManagerInit")
-    
-config_template = ConfigTemplate()
-
-# Generate configuration
-success = config_template.generate_config()
-if success:
-    # Show summary
-    config_template.list_config_summary()
-else:
-    logger.error("Failed to generate configuration.")
-
-cm = ConfigManager(verbose=False)
+__all__ = ["ConfigManager", "ConfigTemplate"]
