@@ -21,6 +21,23 @@ class ConfigTemplate:
         self.modules_controller = ModulesController(Path.cwd())
         self.consolidated_config: Dict[str, Any] = {}
         self.logger = Logger(name="ConfigTemplate")
+
+    def _parse_key_value_format(self, content: str) -> Dict[str, Any]:
+        """Parse simple key=value format content into a dictionary.
+        
+        Args:
+            content: Multi-line string with key=value pairs (# for comments)
+            
+        Returns:
+            Dict[str, Any]: Parsed key-value pairs
+        """
+        config_data: Dict[str, Any] = {}
+        for line in content.split('\n'):
+            line = line.strip()
+            if line and '=' in line and not line.startswith('#'):
+                key, value = line.split('=', 1)
+                config_data[key.strip()] = value.strip()
+        return config_data
     
     def find_config_templates(self) -> Dict[str, str]:
         """
@@ -75,12 +92,7 @@ class ConfigTemplate:
                     return config_data if config_data is not None else {}
                 except json.JSONDecodeError:
                     # If JSON fails, try to parse as simple key=value format
-                    config_data = {}
-                    for line in content.split('\n'):
-                        line = line.strip()
-                        if line and '=' in line and not line.startswith('#'):
-                            key, value = line.split('=', 1)
-                            config_data[key.strip()] = value.strip()
+                    config_data = self._parse_key_value_format(content)
                     
                     return config_data if config_data else {"content": content}
                     
@@ -162,13 +174,7 @@ class ConfigTemplate:
             try:
                 with open(self.config_file_path, 'r') as file:
                     content = file.read().strip()
-                    config_data = {}
-                    for line in content.split('\n'):
-                        line = line.strip()
-                        if line and '=' in line and not line.startswith('#'):
-                            key, value = line.split('=', 1)
-                            config_data[key.strip()] = value.strip()
-                    return config_data
+                    return self._parse_key_value_format(content)
             except Exception:
                 return {}
         except Exception as e:

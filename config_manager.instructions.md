@@ -1,12 +1,12 @@
 ---
-applyTo: "project/**/*.py,managers/**/*.py,plugins/**/*.py,utils/**/*.py,mcps/**/*.py,cores/**/*.py,*.py"
+applyTo: "modules/**/*.py,project/**/*.py,*.py"
 ---
 
 Config Manager:
 - Purpose: Centralized config management for ADHD framework projects, structured access and modification for module settings.
 - Usage:
 ```python
-from managers.config_manager import ConfigManager
+from modules.runtime.config_manager import ConfigManager
 
 cm = ConfigManager()
 config = cm.config.my_module_name

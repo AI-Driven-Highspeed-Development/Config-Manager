@@ -188,6 +188,22 @@ class ConfigKeysGenerator:
                     break
             schema[k] = rep
         return schema
+
+    def _compute_nested_class_names(self, class_name: str, node: Dict[str, Any]) -> Dict[str, str]:
+        """Pre-compute nested class names for all keys in a node to ensure consistency.
+
+        Returns a dict mapping each key to its computed class name (for dicts and list-of-dicts).
+        This avoids computing class names twice with different uniqueness contexts.
+        """
+        is_first_layer = (class_name == 'ConfigKeys')
+        used_names: set[str] = set()
+        name_map: Dict[str, str] = {}
+        for key, val in node.items():
+            if isinstance(val, dict):
+                name_map[key] = self._short_class_name(class_name, key, kind='class', used_names=used_names, is_first_layer=is_first_layer)
+            elif self._is_list_of_dicts(val):
+                name_map[key] = self._short_class_name(class_name, key, kind='item', used_names=used_names, is_first_layer=is_first_layer)
+        return name_map
     
     def _emit_class(self, class_name: str, node: Any, indent_count: int, path: List[str], is_root: bool, parents: List[str] | None = None) -> str:
         if parents is None:
@@ -212,19 +228,22 @@ class ConfigKeysGenerator:
         out.append(f"{indent}\t\t\traise KeyError(key)")
         out.append(f"{indent}\t\treturn self.___DATA___[key]")
 
+        # Pre-compute nested class names once to ensure consistency between Fields and _populate
+        nested_name_map: Dict[str, str] = {}
+        if isinstance(node, dict):
+            nested_name_map = self._compute_nested_class_names(class_name, node)
+
         # Fields
         nested_chunks: List[str] = []
-        used_names: set[str] = set()
         if isinstance(node, dict):
             for key, val in node.items():
-                is_first_layer = (class_name == 'ConfigKeys')
                 if isinstance(val, dict):
-                    nested_cls = self._short_class_name(class_name, key, kind='class', used_names=used_names, is_first_layer=is_first_layer)
+                    nested_cls = nested_name_map[key]
                     out.append(f"{indent}\t{key}: Optional['{nested_cls}'] = None")
                     nested_chunks.append(self._emit_class(nested_cls, val, indent_count + 1, path + [key], False, parents=parents + [class_name]))
                 elif self._is_list_of_dicts(val):
                     item_schema = self._union_dict_schema(val)
-                    item_cls = self._short_class_name(class_name, key, kind='item', used_names=used_names, is_first_layer=is_first_layer)
+                    item_cls = nested_name_map[key]
                     out.append(f"{indent}\t{key}: Optional[List['{item_cls}']] = None")
                     nested_chunks.append(self._emit_class(item_cls, item_schema, indent_count + 1, path + [key, 'item'], False, parents=parents + [class_name]))
                 else:
@@ -259,12 +278,11 @@ class ConfigKeysGenerator:
         if isinstance(node, dict) and node:
             for key, val in node.items():
                 keyq = f"'{key}'"
-                is_first_layer = (class_name == 'ConfigKeys')
                 if isinstance(val, dict):
-                    nested_cls = self._short_class_name(class_name, key, kind='class', is_first_layer=is_first_layer)
+                    nested_cls = nested_name_map[key]
                     out.append(f"{indent}\t\tself.{key} = self.{nested_cls}.from_raw(data.get({keyq}, {{}}))")
                 elif self._is_list_of_dicts(val):
-                    item_cls = self._short_class_name(class_name, key, kind='item', is_first_layer=is_first_layer)
+                    item_cls = nested_name_map[key]
                     out.append(f"{indent}\t\tself.{key} = []")
                     out.append(f"{indent}\t\tfor __it in data.get({keyq}, []):")
                     out.append(f"{indent}\t\t\tself.{key}.append(self.{item_cls}.from_raw(__it))")
